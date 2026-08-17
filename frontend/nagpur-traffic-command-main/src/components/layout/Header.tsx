@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Activity, Bell, Clock, LogOut, Radio, Search, ShieldAlert, User } from "lucide-react";
+import { Activity, Bell, Clock, LogOut, Moon, Radio, Search, ShieldAlert, Sun, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { DESTINATIONS } from "@/data/mockData";
@@ -11,6 +11,7 @@ export function Header() {
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [timeStr, setTimeStr] = useState("");
+  const [isDark, setIsDark] = useState(true);
   const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -32,6 +33,27 @@ export function Header() {
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Initialize theme from localStorage and sync with DOM
+  useEffect(() => {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("raasta-theme") : null;
+    let isDarkMode = true;
+
+    if (stored === "light") {
+      isDarkMode = false;
+    } else if (stored === null) {
+      // Detect system preference if no user preference saved
+      isDarkMode = !window.matchMedia("(prefers-color-scheme: light)").matches;
+    }
+
+    setIsDark(isDarkMode);
+    const html = document.documentElement;
+    if (isDarkMode) {
+      html.classList.remove("light");
+    } else {
+      html.classList.add("light");
+    }
   }, []);
 
   useEffect(() => {
@@ -70,6 +92,20 @@ export function Header() {
     if (dest) {
       planRoute(dest.label);
       void navigate({ to: "/app/map" });
+    }
+  };
+
+  const toggleTheme = () => {
+    const html = document.documentElement;
+    const newIsDark = !isDark;
+    setIsDark(newIsDark);
+
+    if (newIsDark) {
+      html.classList.remove("light");
+      localStorage.setItem("raasta-theme", "dark");
+    } else {
+      html.classList.add("light");
+      localStorage.setItem("raasta-theme", "light");
     }
   };
 
@@ -132,6 +168,17 @@ export function Header() {
           <Radio className={cn("size-3", source === "live" ? "animate-pulse text-normal" : "text-moderate")} />
           <span className="font-semibold">{source === "live" ? "LIVE FEED" : "FALLBACK"}</span>
         </span>
+
+        {/* Theme Toggle */}
+        <button
+          type="button"
+          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          aria-label="Toggle theme"
+          onClick={toggleTheme}
+          className="flex size-7 items-center justify-center border border-border bg-surface-2 text-muted-foreground transition-colors duration-150 hover:text-foreground"
+        >
+          {isDark ? <Sun className="size-3.5" aria-hidden /> : <Moon className="size-3.5" aria-hidden />}
+        </button>
 
         {/* Tactical Alert Icon Button */}
         <button
