@@ -11,12 +11,17 @@ function radiusFor(vehicles: number) {
 
 function MapEffects() {
   const map = useMap();
-  const { selected, focusToken, route, userLocation } = useRaasta();
+  const { selected, focusToken, route, userLocation, searchedLocation } = useRaasta();
 
   useEffect(() => {
     if (!selected) return;
     map.flyTo([selected.latitude, selected.longitude], 14, { duration: 0.6 });
   }, [focusToken, selected, map]);
+
+  useEffect(() => {
+    if (!searchedLocation) return;
+    map.flyTo([searchedLocation.latitude, searchedLocation.longitude], 14, { duration: 0.6 });
+  }, [searchedLocation, map]);
 
   useEffect(() => {
     if (!route || route.path.length === 0) return;
@@ -42,7 +47,7 @@ function MapEffects() {
 }
 
 export default function TrafficMapView() {
-  const { risk, selected, select, focusLocation, route, userLocation } = useRaasta();
+  const { risk, selected, select, focusLocation, route, userLocation, searchedLocation } = useRaasta();
 
   return (
     <MapContainer
@@ -61,6 +66,24 @@ export default function TrafficMapView() {
       />
 
       <MapEffects />
+
+      {/* Searched Location Marker (Geocoded Result) */}
+      {searchedLocation ? (
+        <CircleMarker
+          center={[searchedLocation.latitude, searchedLocation.longitude]}
+          radius={12}
+          pathOptions={{
+            color: "#9333EA",
+            weight: 2.5,
+            fillColor: "#9333EA",
+            fillOpacity: 0.3,
+          }}
+        >
+          <Tooltip direction="top" offset={[0, -8]} opacity={1} permanent>
+            <span className="text-[11px] font-bold text-foreground font-sans">{searchedLocation.name}</span>
+          </Tooltip>
+        </CircleMarker>
+      ) : null}
 
       {/* Strategic Route Corridor Polyline */}
       {route ? (

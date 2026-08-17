@@ -1,11 +1,89 @@
-import { AlertTriangle, Car, Crosshair, Navigation, Shield, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, Car, Crosshair, Info, MapPin, Navigation, Shield, ShieldAlert, X } from "lucide-react";
 
 import { StatusBadge, hexFor, toneFor, toneText } from "@/components/common/StatusBadge";
 import { useRaasta } from "@/lib/raasta/store";
 import { cn } from "@/lib/utils";
 
 export function LocationDetailPanel({ className }: { className?: string | undefined }) {
-  const { selected, select, focusLocation, planRoute } = useRaasta();
+  const { selected, select, focusLocation, planRoute, searchedLocation, setSearchedLocation } = useRaasta();
+
+  // If no selected location but a searched location exists, show "no risk data" panel
+  if (!selected && searchedLocation) {
+    return (
+      <section
+        className={cn(
+          "flex flex-col border bg-surface shadow-md overflow-hidden transition-all border-moderate/60",
+          className
+        )}
+        aria-label={`Location details for ${searchedLocation.name}`}
+      >
+        <header className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-surface-2 px-3">
+          <div className="flex items-center gap-1.5">
+            <MapPin className="size-3.5 text-moderate" aria-hidden />
+            <h2 className="label-xs text-foreground font-mono tracking-wider">Location Information</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSearchedLocation(null)}
+            title="Clear Search"
+            aria-label="Close panel"
+            className="text-muted-foreground transition-colors duration-150 hover:text-foreground p-0.5"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        </header>
+
+        <div className="overflow-y-auto scroll-thin p-3 space-y-3">
+          {/* Location Title */}
+          <div>
+            <h3 className="text-[16px] leading-tight font-bold text-foreground uppercase tracking-tight">
+              {searchedLocation.name}
+            </h3>
+            <div className="tabular mt-0.5 text-[10.5px] font-mono text-subtle">
+              COORDS: {searchedLocation.latitude.toFixed(4)}°N, {searchedLocation.longitude.toFixed(4)}°E
+            </div>
+          </div>
+
+          {/* No Risk Data Message */}
+          <div className="flex flex-col gap-2 rounded-xs border border-moderate/40 bg-moderate-bg/20 p-3">
+            <div className="flex items-start gap-2">
+              <Info className="size-4 text-moderate shrink-0 mt-0.5" aria-hidden />
+              <div>
+                <h4 className="label-xs text-moderate font-bold mb-1">Location Found</h4>
+                <p className="text-[11.5px] text-foreground/90 leading-relaxed">
+                  Detailed risk analysis is currently unavailable for this location because sufficient traffic/incident data is not available.
+                </p>
+                <p className="text-[10.5px] text-muted-foreground mt-2">
+                  This location is outside the five monitored sectors (Sitabuldi, Wardha Road, Sadar, Manish Nagar, Hingna Road).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Monitored Sectors Info */}
+          <div className="border border-border/70 bg-surface-2/40 p-2.5 rounded-xs">
+            <h4 className="label-xs text-muted-foreground font-mono mb-2 flex items-center gap-1.5">
+              <Shield className="size-3 text-active" /> Monitored Sectors
+            </h4>
+            <p className="text-[11.5px] text-foreground/80 leading-relaxed">
+              RAASTA currently provides detailed risk analysis for: Sitabuldi, Wardha Road, Sadar, Manish Nagar, and Hingna Road.
+            </p>
+          </div>
+
+          {/* Tactical Actions */}
+          <div className="grid grid-cols-1 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setSearchedLocation(null)}
+              className="flex items-center justify-center gap-1.5 border border-border bg-surface-2 py-2 text-[11px] font-bold tracking-wider text-foreground uppercase transition-colors duration-150 hover:bg-accent"
+            >
+              <X className="size-3.5" aria-hidden /> Clear Search
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (!selected) {
     return (

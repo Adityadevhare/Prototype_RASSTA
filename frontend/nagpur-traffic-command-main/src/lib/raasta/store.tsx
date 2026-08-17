@@ -5,6 +5,12 @@ import { useRiskData } from "@/hooks/useRiskData";
 import type { RiskLocation, RouteEstimate } from "@/lib/raasta/types";
 import { getRoute } from "@/services/api";
 
+export interface SearchedLocation {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
 interface RaastaContextValue {
   risk: RiskLocation[];
   isLoading: boolean;
@@ -22,6 +28,8 @@ interface RaastaContextValue {
   planRoute: (to: string) => Promise<void> | void;
   clearRoute: () => void;
   userLocation: typeof MOCK_USER_LOCATION;
+  searchedLocation: SearchedLocation | null;
+  setSearchedLocation: (location: SearchedLocation | null) => void;
 }
 
 const RaastaContext = createContext<RaastaContextValue | null>(null);
@@ -34,6 +42,7 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<RouteEstimate | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [isRouting, setIsRouting] = useState(false);
+  const [searchedLocation, setSearchedLocation] = useState<SearchedLocation | null>(null);
 
   const select = useCallback((name: string | null) => setSelectedName(name), []);
 
@@ -41,6 +50,36 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
     setSelectedName(name);
     setFocusToken((t) => t + 1);
   }, []);
+
+  const geocodeDestination = useCallback(
+    async (locationName: string): Promise<[number, number] | null> => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+            locationName + ", Nagpur, Maharashtra, India"
+          )}&format=json&limit=1`,
+          {
+            headers: {
+              "User-Agent": "RAASTA-Nagpur-App/1.0",
+            },
+          }
+        );
+
+        if (!response.ok) return null;
+        const results = await response.json();
+        if (!Array.isArray(results) || results.length === 0) return null;
+
+        const result = results[0];
+        return [
+          parseFloat(result.lat),
+          parseFloat(result.lon),
+        ];
+      } catch {
+        return null;
+      }
+    },
+    []
+  );
 
   const planRoute = useCallback(
     async (to: string) => {
@@ -51,8 +90,12 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
       setRouteError(null);
 
       try {
+        // Try to geocode the destination first to get coordinates
+        const destCoords = await geocodeDestination(target);
+
         const response = await getRoute({
           origin: [MOCK_USER_LOCATION.latitude, MOCK_USER_LOCATION.longitude],
+          destination: destCoords || undefined,
           originName: MOCK_USER_LOCATION.label,
           destinationName: target,
           risk,
@@ -78,7 +121,7 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
         setIsRouting(false);
       }
     },
-    [risk],
+    [risk, geocodeDestination],
   );
 
   const clearRoute = useCallback(() => {
@@ -104,6 +147,8 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
       planRoute,
       clearRoute,
       userLocation: MOCK_USER_LOCATION,
+      searchedLocation,
+      setSearchedLocation,
     }),
     [
       risk,
@@ -120,6 +165,8 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
       isRouting,
       planRoute,
       clearRoute,
+      searchedLocation,
+      setSearchedLocation,
     ],
   );
 

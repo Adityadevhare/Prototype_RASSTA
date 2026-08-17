@@ -3,18 +3,92 @@ import { Activity, Bell, Clock, LogOut, Moon, Radio, Search, ShieldAlert, Sun, U
 import { useEffect, useRef, useState } from "react";
 
 import { DESTINATIONS } from "@/data/mockData";
+import type { SearchedLocation } from "@/lib/raasta/store";
 import { useRaasta } from "@/lib/raasta/store";
 import { cn } from "@/lib/utils";
 
+/**
+ * Local aliases for known locations (e.g., common names in local language)
+ */
+const LOCATION_ALIASES: Record<string, string> = {
+  "bardi": "Sitabuldi", // Local alias for Sitabuldi sector
+};
+
+/**
+ * Improved location search matching strategy:
+ * 1. Check aliases first
+ * 2. Exact match (normalized case)
+ * 3. Starts-with match
+ * 4. Contains match
+ * Returns the best match or null
+ */
+function findBestLocationMatch<T extends { label?: string; location?: string }>(
+  term: string,
+  locations: T[]
+): T | null {
+  const normalized = term.trim().toLowerCase();
+  if (!normalized) return null;
+
+  // Stage 0: Check aliases
+  if (normalized in LOCATION_ALIASES) {
+    const aliasTarget = LOCATION_ALIASES[normalized];
+    const aliasMatch = locations.find(
+      (l) => (l.location || l.label || "").toLowerCase() === aliasTarget.toLowerCase()
+    );
+    if (aliasMatch) return aliasMatch;
+  }
+
+  // Stage 1: Exact match
+  const exact = locations.find(
+    (l) => (l.location || l.label || "").toLowerCase() === normalized
+  );
+  if (exact) return exact;
+
+  // Stage 2: Starts-with match (prioritizes word-start matches)
+  const startsWith = locations.filter((l) =>
+    (l.location || l.label || "").toLowerCase().startsWith(normalized)
+  );
+  if (startsWith.length === 1) return startsWith[0];
+  if (startsWith.length > 1) {
+    // Return shortest match (most specific)
+    return startsWith.reduce((best, current) =>
+      (current.location || current.label || "").length <
+      (best.location || best.label || "").length
+        ? current
+        : best
+    );
+  }
+
+  // Stage 3: Contains match (substring anywhere)
+  const contains = locations.filter((l) =>
+    (l.location || l.label || "").toLowerCase().includes(normalized)
+  );
+  if (contains.length === 1) return contains[0];
+  if (contains.length > 1) {
+    // Return shortest match (most specific)
+    return contains.reduce((best, current) =>
+      (current.location || current.label || "").length <
+      (best.location || best.label || "").length
+        ? current
+        : best
+    );
+  }
+
+  return null;
+}
+
 export function Header() {
-  const { risk, focusLocation, planRoute, source } = useRaasta();
+  const { risk, focusLocation, planRoute, source, setSearchedLocation } = useRaasta();
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [timeStr, setTimeStr] = useState("");
   const [isDark, setIsDark] = useState(true);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
   const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const criticalCount = risk.filter((r) => r.risk_level === "CRITICAL" || r.risk_level === "HIGH").length;
 
@@ -82,18 +156,94 @@ export function Header() {
     e.preventDefault();
     const term = query.trim().toLowerCase();
     if (!term) return;
-    const match = risk.find((r) => r.location.toLowerCase().includes(term));
-    if (match) {
-      focusLocation(match.location);
+
+    setGeocodeError(null);
+
+    // Stage 1: Try to find in existing RAASTA monitored sectors
+    // Uses improved fuzzy matching: exact → starts-with → contains
+    const riskMatch = findBestLocationMatch(term, risk);
+    if (riskMatch) {
+      focusLocation(riskMatch.location);
+      setSearchedLocation(null);
+      setQuery("");
       void navigate({ to: "/app/map" });
       return;
     }
-    const dest = DESTINATIONS.find((d) => d.label.toLowerCase().includes(term));
-    if (dest) {
-      planRoute(dest.label);
+
+    // Stage 2: Try to find in destination routes
+    const destMatch = findBestLocationMatch(term, DESTINATIONS);
+    if (destMatch) {
+      planRoute(destMatch.label);
+      setSearchedLocation(null);
+      setQuery("");
       void navigate({ to: "/app/map" });
+      return;
+    }
+
+    // Stage 3: Fall back to geocoding for other Nagpur locations
+    geocodeLocation(term);
+  };
+
+  const geocodeLocation = async (locationName: string) => {
+    setIsGeocoding(true);
+    setGeocodeError(null);
+
+    try {
+      // Use Nominatim (OpenStreetMap) for free geocoding
+      // Search focused on Nagpur, Maharashtra, India
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          locationName + ", Nagpur, Maharashtra, India"
+        )}&format=json&limit=1`,
+        {
+          headers: {
+            "User-Agent": "RAASTA-Nagpur-App/1.0",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Geocoding service unavailable");
+      }
+
+      const results = await response.json();
+
+      if (!Array.isArray(results) || results.length === 0) {
+        setGeocodeError(`Location "${locationName}" not found`);
+        // Clear error after 4 seconds
+        if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+        errorTimeoutRef.current = setTimeout(() => setGeocodeError(null), 4000);
+        setIsGeocoding(false);
+        return;
+      }
+
+      const result = results[0];
+      const searchedLoc: SearchedLocation = {
+        name: result.display_name?.split(",")[0] || locationName,
+        latitude: parseFloat(result.lat),
+        longitude: parseFloat(result.lon),
+      };
+
+      setSearchedLocation(searchedLoc);
+      setQuery("");
+      void navigate({ to: "/app/map" });
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to geocode location";
+      setGeocodeError(errorMsg);
+      // Clear error after 4 seconds
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = setTimeout(() => setGeocodeError(null), 4000);
+    } finally {
+      setIsGeocoding(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    };
+  }, []);
 
   const toggleTheme = () => {
     const html = document.documentElement;
@@ -140,10 +290,24 @@ export function Header() {
             ref={searchInputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            disabled={isGeocoding}
             aria-label="Search sector or destination"
             placeholder="Search sector, corridor, or destination...  (Ctrl+K)"
-            className="h-8 w-full border border-border bg-background/80 pr-2 pl-8 text-[12.5px] text-foreground placeholder:text-subtle/80 focus:border-active focus:bg-background focus:outline-none transition-all"
+            className={cn(
+              "h-8 w-full border border-border bg-background/80 pr-2 pl-8 text-[12.5px] text-foreground placeholder:text-subtle/80 focus:border-active focus:bg-background focus:outline-none transition-all",
+              geocodeError && "border-critical/60 focus:border-critical"
+            )}
           />
+          {isGeocoding && (
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">
+              searching...
+            </span>
+          )}
+          {geocodeError && !isGeocoding && (
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-critical font-semibold">
+              ✗ {geocodeError}
+            </span>
+          )}
         </div>
       </form>
 
