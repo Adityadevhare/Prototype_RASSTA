@@ -1,5 +1,7 @@
+from typing import Optional, List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.data import get_traffic_data
 from app.risk_engine import (
@@ -7,6 +9,7 @@ from app.risk_engine import (
     get_risk_level,
     get_deployment_recommendation
 )
+from app.routing import get_route
 
 app = FastAPI(
     title="RAASTA API",
@@ -17,8 +20,14 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
         "http://192.168.1.2:8080",
     ],
     allow_credentials=True,
@@ -146,6 +155,46 @@ def summary():
         "highest_risk_score": highest_risk_score,
         "total_police_units": total_police_units
     }
+
+
+class RouteRequest(BaseModel):
+    origin: Optional[List[float]] = None
+    destination: Optional[List[float]] = None
+    origin_name: Optional[str] = "Current Location"
+    destination_name: Optional[str] = "Nagpur Airport"
+
+
+# --------------------------------------------------
+# ROUTE ENDPOINT (OpenRouteService + Risk Fallback)
+# --------------------------------------------------
+
+@app.post("/api/route")
+def route_post(req: RouteRequest):
+    return get_route(
+        origin=req.origin,
+        destination=req.destination,
+        origin_name=req.origin_name or "Current Location",
+        destination_name=req.destination_name or "Nagpur Airport"
+    )
+
+
+@app.get("/api/route")
+def route_get(
+    to: Optional[str] = "Nagpur Airport",
+    start_lat: Optional[float] = None,
+    start_lon: Optional[float] = None,
+    end_lat: Optional[float] = None,
+    end_lon: Optional[float] = None,
+    origin_name: Optional[str] = "Current Location"
+):
+    origin = [start_lat, start_lon] if start_lat is not None and start_lon is not None else None
+    destination = [end_lat, end_lon] if end_lat is not None and end_lon is not None else None
+    return get_route(
+        origin=origin,
+        destination=destination,
+        origin_name=origin_name or "Current Location",
+        destination_name=to or "Nagpur Airport"
+    )
 
 
 '''

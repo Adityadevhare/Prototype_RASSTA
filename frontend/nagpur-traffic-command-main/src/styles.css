@@ -136,14 +136,10 @@
   }
 }
 
-/* Leaflet integration: keep the dark surface consistent */
+/* Leaflet integration: dark operations interface */
 .leaflet-container {
   background: oklch(0.1618 0.008 248.32);
   font-family: var(--font-sans);
-}
-
-.leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.92) saturate(0.55);
 }
 
 .leaflet-control-attribution {
@@ -162,7 +158,7 @@
   color: var(--foreground);
   border: 1px solid var(--border);
   border-radius: 3px;
-  box-shadow: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .leaflet-popup-content {
@@ -173,6 +169,32 @@
 .leaflet-popup-close-button {
   color: var(--muted-foreground) !important;
 }
+
+/* Dark-themed tooltip */
+.leaflet-tooltip {
+  background: var(--surface-2) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 3px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+  font-family: var(--font-sans) !important;
+  padding: 4px 8px !important;
+}
+
+.leaflet-tooltip-top::before {
+  border-top-color: var(--border) !important;
+}
+.leaflet-tooltip-bottom::before {
+  border-bottom-color: var(--border) !important;
+}
+.leaflet-tooltip-left::before {
+  border-left-color: var(--border) !important;
+}
+.leaflet-tooltip-right::before {
+  border-right-color: var(--border) !important;
+}
+
+/* ── Animations ── */
 
 @keyframes raasta-pulse {
   0%,
@@ -186,4 +208,36 @@
 
 @utility live-dot {
   animation: raasta-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes raasta-critical-ring {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.15;
+    transform: scale(1.6);
+  }
+}
+
+/* Route animated dash (applied via JS) */
+@keyframes raasta-route-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.raasta-route-dash {
+  stroke-dasharray: 8 12;
+  animation: raasta-route-dash 1.2s linear infinite;
+}
+
+/* ── Interaction helpers ── */
+
+@utility interact {
+  transition-property: color, background-color, border-color, opacity, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
 }

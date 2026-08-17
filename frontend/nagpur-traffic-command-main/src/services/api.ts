@@ -2,9 +2,10 @@ import {
   MOCK_RISK_DATA,
   MOCK_SUMMARY,
   MOCK_TRAFFIC_DATA,
+  mockRoute,
   summaryFromRisk,
 } from "@/data/mockData";
-import type { Fetched, RiskLocation, Summary, TrafficRecord } from "@/lib/raasta/types";
+import type { Fetched, RiskLocation, RouteEstimate, Summary, TrafficRecord } from "@/lib/raasta/types";
 
 /**
  * RAASTA API service layer. All backend access goes through this module —
@@ -14,13 +15,18 @@ import type { Fetched, RiskLocation, Summary, TrafficRecord } from "@/lib/raasta
 export const API_BASE_URL =
   (import.meta.env["VITE_RAASTA_API_URL"] as string | undefined) ?? "http://127.0.0.1:8000";
 
-async function request<T>(path: string, timeoutMs = 4000): Promise<T> {
+async function request<T>(path: string, timeoutMs = 7000, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
       signal: controller.signal,
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...options.headers,
+      },
     });
     if (!res.ok) throw new Error(`Request failed (${res.status})`);
     return (await res.json()) as T;
@@ -87,5 +93,50 @@ export async function getSummary(): Promise<Fetched<Summary>> {
   }
 }
 
+/** POST /api/route — calls OpenRouteService via backend with fallback to local corridor */
+export async function getRoute(params: {
+  origin?: [number, number];
+  destination?: [number, number];
+  originName?: string;
+  destinationName: string;
+  risk?: RiskLocation[];
+}): Promise<Fetched<RouteEstimate>> {
+  try {
+    const data = await request<RouteEstimate>("/api/route", 7000, {
+      method: "POST",
+      body: JSON.stringify({
+        origin: params.origin,
+        destination: params.destination,
+        origin_name: params.originName || "Current Location",
+        destination_name: params.destinationName,
+      }),
+    });
+
+    if (!data || !Array.isArray(data.path) || data.path.length === 0) {
+      throw new Error("Invalid route geometry returned");
+    }
+
+    return {
+      data,
+      source: data.source === "live" ? "live" : "mock",
+    };
+  } catch (err) {
+    // Local fallback when backend is offline
+    const fallbackData = mockRoute(params.destinationName, params.risk || MOCK_RISK_DATA);
+    if (!fallbackData) {
+      throw new Error(`Unable to calculate route to "${params.destinationName}"`);
+    }
+    return {
+      data: {
+        ...fallbackData,
+        source: "mock",
+      },
+      source: "mock",
+      error: err instanceof Error ? err.message : "Backend routing offline",
+    };
+  }
+}
+
 /** Derive a summary locally when only risk rows are available. */
 export const deriveSummary = summaryFromRisk;
+

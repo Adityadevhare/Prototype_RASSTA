@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { MOCK_USER_LOCATION, mockRoute } from "@/data/mockData";
 import { useRiskData } from "@/hooks/useRiskData";
 import type { RiskLocation, RouteEstimate } from "@/lib/raasta/types";
+import { getRoute } from "@/services/api";
 
 interface RaastaContextValue {
   risk: RiskLocation[];
@@ -17,7 +18,8 @@ interface RaastaContextValue {
   focusLocation: (name: string) => void;
   route: RouteEstimate | null;
   routeError: string | null;
-  planRoute: (to: string) => void;
+  isRouting: boolean;
+  planRoute: (to: string) => Promise<void> | void;
   clearRoute: () => void;
   userLocation: typeof MOCK_USER_LOCATION;
 }
@@ -31,6 +33,7 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
   const [focusToken, setFocusToken] = useState(0);
   const [route, setRoute] = useState<RouteEstimate | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [isRouting, setIsRouting] = useState(false);
 
   const select = useCallback((name: string | null) => setSelectedName(name), []);
 
@@ -40,15 +43,40 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const planRoute = useCallback(
-    (to: string) => {
-      const result = mockRoute(to, risk);
-      if (!result) {
-        setRoute(null);
-        setRouteError(`No known destination matching "${to}".`);
-        return;
-      }
+    async (to: string) => {
+      const target = to.trim();
+      if (!target) return;
+
+      setIsRouting(true);
       setRouteError(null);
-      setRoute(result);
+
+      try {
+        const response = await getRoute({
+          origin: [MOCK_USER_LOCATION.latitude, MOCK_USER_LOCATION.longitude],
+          originName: MOCK_USER_LOCATION.label,
+          destinationName: target,
+          risk,
+        });
+
+        if (response.data) {
+          setRoute(response.data);
+          setRouteError(null);
+        } else {
+          throw new Error(`Unable to calculate route to "${target}".`);
+        }
+      } catch (err) {
+        // Safe fallback to client-side corridor generator
+        const fallback = mockRoute(target, risk);
+        if (fallback) {
+          setRoute(fallback);
+          setRouteError(null);
+        } else {
+          setRoute(null);
+          setRouteError(err instanceof Error ? err.message : `No known destination matching "${target}".`);
+        }
+      } finally {
+        setIsRouting(false);
+      }
     },
     [risk],
   );
@@ -72,6 +100,7 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
       focusLocation,
       route,
       routeError,
+      isRouting,
       planRoute,
       clearRoute,
       userLocation: MOCK_USER_LOCATION,
@@ -88,6 +117,7 @@ export function RaastaProvider({ children }: { children: ReactNode }) {
       focusLocation,
       route,
       routeError,
+      isRouting,
       planRoute,
       clearRoute,
     ],
@@ -101,3 +131,4 @@ export function useRaasta() {
   if (!ctx) throw new Error("useRaasta must be used inside RaastaProvider");
   return ctx;
 }
+

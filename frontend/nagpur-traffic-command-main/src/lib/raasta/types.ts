@@ -55,4 +55,13 @@ export interface RouteEstimate {
   condition: RiskLevel;
   path: [number, number][];
   note: string;
+  source?: "live" | "mock" | "fallback";
+  status?: string;
+  risk_score?: number;
+  intercepted_sectors?: Array<{
+    location: string;
+    risk_score: number;
+    risk_level: RiskLevel;
+    distance_km: number;
+  }>;
 }

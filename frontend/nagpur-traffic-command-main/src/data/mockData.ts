@@ -98,16 +98,18 @@ export const MOCK_TRAFFIC_DATA: TrafficRecord[] = MOCK_RISK_DATA.map((r) => ({
 }));
 
 export function summaryFromRisk(rows: RiskLocation[]): Summary {
-  const high = rows.filter((r) => r.risk_level === "CRITICAL").length;
-  const medium = rows.filter((r) => r.risk_level === "HIGH" || r.risk_level === "MODERATE").length;
-  const low = rows.filter((r) => r.risk_level === "NORMAL").length;
+  const critical = rows.filter((r) => r.risk_level === "CRITICAL").length;
+  const high = rows.filter((r) => r.risk_level === "HIGH").length;
+  const moderate = rows.filter((r) => r.risk_level === "MODERATE").length;
+  const normal = rows.filter((r) => r.risk_level === "NORMAL").length;
   const avg = rows.length ? rows.reduce((s, r) => s + r.risk_score, 0) / rows.length : 0;
   const top = [...rows].sort((a, b) => b.risk_score - a.risk_score)[0];
   return {
     total_locations: rows.length,
+    critical_risk_locations: critical,
     high_risk_locations: high,
-    medium_risk_locations: medium,
-    low_risk_locations: low,
+    moderate_risk_locations: moderate,
+    normal_risk_locations: normal,
     average_risk_score: Math.round(avg * 100) / 100,
     highest_risk_location: top?.location ?? "—",
     highest_risk_score: top?.risk_score ?? 0,
@@ -118,44 +120,93 @@ export function summaryFromRisk(rows: RiskLocation[]): Summary {
 export const MOCK_SUMMARY: Summary = summaryFromRisk(MOCK_RISK_DATA);
 
 export const DESTINATIONS = [
-  { label: "Nagpur Airport", latitude: 21.0922, longitude: 79.0472 },
-  { label: "Sitabuldi", latitude: 21.1465, longitude: 79.0785 },
-  { label: "Sadar", latitude: 21.1652, longitude: 79.0812 },
-  { label: "Manish Nagar", latitude: 21.0861, longitude: 79.0592 },
-  { label: "Hingna Road", latitude: 21.1147, longitude: 78.9812 },
-  { label: "Nagpur Railway Station", latitude: 21.1522, longitude: 79.0866 },
+  { label: "Nagpur Airport", latitude: 21.0922, longitude: 79.0472, description: "Dr. Babasaheb Ambedkar Intl Airport via Wardha Rd" },
+  { label: "Sitabuldi", latitude: 21.1465, longitude: 79.0785, description: "Central Interchange & Metro Junction" },
+  { label: "Sadar", latitude: 21.1652, longitude: 79.0812, description: "Residency Rd & Commercial Zone" },
+  { label: "Manish Nagar", latitude: 21.0861, longitude: 79.0592, description: "Besa-Manish Nagar Underpass Sector" },
+  { label: "Hingna Road", latitude: 21.1147, longitude: 78.9812, description: "MIDC Industrial & Institutional Belt" },
+  { label: "Nagpur Railway Station", latitude: 21.1522, longitude: 79.0866, description: "Central Railway Terminal & Kingsway" },
 ];
 
-/** Mock route generator — swap for a real routing API (OSRM/Mapbox) later. */
+/** Handcrafted realistic corridor waypoints starting from Current Location [21.1398, 79.0805] (Dharampeth/Ramdaspeth area) */
+const CORRIDOR_PATHS: Record<string, [number, number][]> = {
+  "Nagpur Airport": [
+    [21.1398, 79.0805], // Current Location (Ramdaspeth)
+    [21.1325, 79.0760], // Lokmat Square
+    [21.1248, 79.0680], // Rahate Colony Square
+    [21.1165, 79.0585], // Chhatrapati Square
+    [21.1095, 79.0520], // Ajni / Wardha Road Flyover
+    [21.1020, 79.0480], // Ujjwal Nagar
+    [21.0955, 79.0475], // Sonegaon approach
+    [21.0922, 79.0472], // Nagpur Airport Terminal
+  ],
+  "Sitabuldi": [
+    [21.1398, 79.0805], // Ramdaspeth
+    [21.1415, 79.0780], // Shankar Nagar Rd
+    [21.1438, 79.0765], // Law College Square
+    [21.1452, 79.0772], // Variety Square approach
+    [21.1465, 79.0785], // Sitabuldi Main Interchange
+  ],
+  "Sadar": [
+    [21.1398, 79.0805], // Ramdaspeth
+    [21.1460, 79.0790], // Sitabuldi Flyover
+    [21.1510, 79.0800], // RBI Square
+    [21.1575, 79.0808], // Liberty Square / Residency Rd
+    [21.1652, 79.0812], // Sadar Market Center
+  ],
+  "Manish Nagar": [
+    [21.1398, 79.0805], // Ramdaspeth
+    [21.1310, 79.0740], // Congress Nagar
+    [21.1215, 79.0650], // Narendra Nagar Flyover
+    [21.1110, 79.0620], // Somalwada Square
+    [21.0980, 79.0605], // Manish Nagar T-Point
+    [21.0861, 79.0592], // Manish Nagar Central
+  ],
+  "Hingna Road": [
+    [21.1398, 79.0805], // Ramdaspeth
+    [21.1370, 79.0650], // Dharampeth / Coffee House
+    [21.1340, 79.0450], // Ambazari Lake Drive
+    [21.1280, 79.0200], // VNIT / Subhash Nagar
+    [21.1210, 79.0020], // Hingna T-Point / YCCE Sector
+    [21.1147, 78.9812], // Hingna Road Industrial Belt
+  ],
+  "Nagpur Railway Station": [
+    [21.1398, 79.0805], // Ramdaspeth
+    [21.1445, 79.0810], // Anand Talkies
+    [21.1480, 79.0835], // Munje Square
+    [21.1505, 79.0855], // Kasturchand Park / Kingsway
+    [21.1522, 79.0866], // Nagpur Railway Station Main Gate
+  ],
+};
+
+/** Mock route generator with plausible road corridor geometry */
 export function mockRoute(toLabel: string, risk: RiskLocation[]): RouteEstimate | null {
   const dest = DESTINATIONS.find((d) => d.label.toLowerCase() === toLabel.trim().toLowerCase());
   if (!dest) return null;
+
   const from: [number, number] = [MOCK_USER_LOCATION.latitude, MOCK_USER_LOCATION.longitude];
   const to: [number, number] = [dest.latitude, dest.longitude];
-  
-  // Create multiple smooth waypoints between origin and destination
-  const mid1: [number, number] = [
-    from[0] + (to[0] - from[0]) * 0.3 + 0.005,
-    from[1] + (to[1] - from[1]) * 0.3 - 0.003,
-  ];
-  const mid2: [number, number] = [
-    from[0] + (to[0] - from[0]) * 0.6 - 0.004,
-    from[1] + (to[1] - from[1]) * 0.6 + 0.004,
+
+  const path = CORRIDOR_PATHS[dest.label] || [
+    from,
+    [from[0] + (to[0] - from[0]) * 0.35 + 0.003, from[1] + (to[1] - from[1]) * 0.35 - 0.002],
+    [from[0] + (to[0] - from[0]) * 0.7 - 0.002, from[1] + (to[1] - from[1]) * 0.7 + 0.003],
+    to,
   ];
 
-  const km = haversine(from, to) * 1.28;
+  const km = haversine(from, to) * 1.35;
   const nearest = [...risk].sort((a, b) => dist(a, to) - dist(b, to))[0];
   const condition = nearest?.risk_level ?? "NORMAL";
-  const speed = condition === "CRITICAL" ? 14 : condition === "HIGH" ? 19 : condition === "MODERATE" ? 25 : 32;
-  
+  const speed = condition === "CRITICAL" ? 14 : condition === "HIGH" ? 18 : condition === "MODERATE" ? 26 : 34;
+
   return {
     from: MOCK_USER_LOCATION.label,
     to: dest.label,
     distanceKm: Math.round(km * 10) / 10,
-    durationMin: Math.round((km / speed) * 60),
+    durationMin: Math.max(4, Math.round((km / speed) * 60)),
     condition,
-    path: [from, mid1, mid2, to],
-    note: `Estimate based on sample data near ${nearest?.location ?? "Nagpur"}.`,
+    path,
+    note: `Strategic corridor via ${nearest?.location ?? "Nagpur Central"} Sector.`,
   };
 }
 
