@@ -1,0 +1,189 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+@import "leaflet/dist/leaflet.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * RAASTA design system — dark geospatial operations interface.
+ * Colors are oklch tokens. Traffic colors are semantic only.
+ */
+
+@theme inline {
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+  --radius-3xl: 10px;
+  --radius-4xl: 12px;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-normal: var(--normal);
+  --color-normal-bg: var(--normal-bg);
+  --color-moderate: var(--moderate);
+  --color-moderate-bg: var(--moderate-bg);
+  --color-critical: var(--critical);
+  --color-critical-bg: var(--critical-bg);
+  --color-active: var(--active);
+  --color-active-bg: var(--active-bg);
+  --color-chart-1: var(--normal);
+  --color-chart-2: var(--moderate);
+  --color-chart-3: var(--critical);
+  --color-chart-4: var(--active);
+  --color-chart-5: var(--muted-foreground);
+}
+
+:root {
+  --radius: 3px;
+  --background: oklch(0.2154 0.01 248.29);
+  --foreground: oklch(0.967 0.0029 264.54);
+  --surface: oklch(0.2533 0.012 248.3);
+  --surface-2: oklch(0.2862 0.0116 248.23);
+  --card: oklch(0.2533 0.012 248.3);
+  --card-foreground: oklch(0.967 0.0029 264.54);
+  --popover: oklch(0.2862 0.0116 248.23);
+  --popover-foreground: oklch(0.967 0.0029 264.54);
+  --primary: oklch(0.6231 0.188 259.81);
+  --primary-foreground: oklch(0.967 0.0029 264.54);
+  --secondary: oklch(0.2862 0.0116 248.23);
+  --secondary-foreground: oklch(0.967 0.0029 264.54);
+  --muted: oklch(0.2862 0.0116 248.23);
+  --muted-foreground: oklch(0.7137 0.0192 261.32);
+  --subtle: oklch(0.551 0.0234 264.36);
+  --accent: oklch(0.3213 0.0122 243.21);
+  --accent-foreground: oklch(0.967 0.0029 264.54);
+  --destructive: oklch(0.6368 0.2078 25.33);
+  --destructive-foreground: oklch(0.967 0.0029 264.54);
+  --border: oklch(0.3379 0.0111 248.16);
+  --border-strong: oklch(0.4 0.011 248.16);
+  --input: oklch(0.3379 0.0111 248.16);
+  --ring: oklch(0.6231 0.188 259.81);
+
+  --normal: oklch(0.6959 0.1491 162.48);
+  --normal-bg: oklch(0.2705 0.048 172.46);
+  --moderate: oklch(0.7686 0.1647 70.08);
+  --moderate-bg: oklch(0.2791 0.0742 45.64);
+  --critical: oklch(0.6368 0.2078 25.33);
+  --critical-bg: oklch(0.2575 0.0886 26.04);
+  --active: oklch(0.6231 0.188 259.81);
+  --active-bg: oklch(0.2823 0.0874 267.94);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    font-size: 13.5px;
+    line-height: 1.45;
+  }
+}
+
+@utility label-xs {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 4px;
+  }
+}
+
+/* Leaflet integration: keep the dark surface consistent */
+.leaflet-container {
+  background: oklch(0.1618 0.008 248.32);
+  font-family: var(--font-sans);
+}
+
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.92) saturate(0.55);
+}
+
+.leaflet-control-attribution {
+  background: color-mix(in oklab, var(--background) 85%, transparent) !important;
+  color: var(--subtle) !important;
+  font-size: 10px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--muted-foreground) !important;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--surface-2);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  box-shadow: none;
+}
+
+.leaflet-popup-content {
+  margin: 8px 10px;
+  font-size: 12px;
+}
+
+.leaflet-popup-close-button {
+  color: var(--muted-foreground) !important;
+}
+
+@keyframes raasta-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@utility live-dot {
+  animation: raasta-pulse 2.4s ease-in-out infinite;
+}

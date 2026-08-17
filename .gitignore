@@ -1,0 +1,67 @@
+# =========================
+# FRONTEND / NODE
+# =========================
+node_modules/
+dist/
+dist-ssr/
+.output/
+.vinxi/
+.tanstack/
+.nitro/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+*.local
+
+# =========================
+# PYTHON / BACKEND
+# =========================
+__pycache__/
+*.py[cod]
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python tooling / cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+# ENVIRONMENT / SECRETS
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# IDE / OS
+# =========================
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# =========================
+# LOGS
+# =========================
+logs/
+*.log
+
+# =========================
+# BUILD / TEMP FILES
+# =========================
+*.tmp
+*.temp
