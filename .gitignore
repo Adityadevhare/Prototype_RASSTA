@@ -64,4 +64,5 @@ logs/
 # BUILD / TEMP FILES
 # =========================
 *.tmp
-*.temp
+*.temp.env
+.env.*
